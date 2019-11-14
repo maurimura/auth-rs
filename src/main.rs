@@ -2,21 +2,36 @@ use actix_identity::Identity;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 
-fn index(id: Identity) -> HttpResponse {
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct FormData {
+    data: String,
+}
+
+
+fn index(id: Identity) -> String {
     format!(
         "Hello {}",
         id.identity().unwrap_or_else(|| "Anonymous".to_owned())
-    );
-    let form = String::from("<form action=\"/login\" method=\"post\">
-    <input type=\"text\" name=\"data\" value=\"mauri\" />
-    <input type=\"submit\" />
-  </form>");
-  
-  HttpResponse::Ok().body(form)
+    )
 }
 
-fn login(id: Identity) -> HttpResponse {
-    id.remember("user1".to_owned());
+fn from() -> HttpResponse {
+    let form = String::from(
+        "<form action=\"/login\" method=\"post\">
+    <input type=\"text\" name=\"data\" value=\"mauri\" />
+    <input type=\"submit\" />
+  </form>",
+    );
+
+    HttpResponse::Ok().body(form)
+}
+
+fn login(id: Identity, form: web::Form<FormData>) -> HttpResponse {
+    println!("{}", form.data);
+
+    id.remember(form.data.to_owned());
     HttpResponse::Found().header("location", "/").finish()
 }
 
@@ -40,6 +55,7 @@ fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .service(web::resource("/login").route(web::post().to(login)))
             .service(web::resource("/logout").to(logout))
+            .service(web::resource("/signup").route(web::get().to(from)))
             .service(web::resource("/").route(web::get().to(index)))
     })
     .bind("127.0.0.1:3000")?
