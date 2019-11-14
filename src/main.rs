@@ -1,59 +1,47 @@
-extern crate hyper;
-use hyper::rt::Future;
-use hyper::service::service_fn;
+use actix_identity::Identity;
+use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 
-extern crate futures;
-use futures::future;
-
-use hyper::{Body, Request, Response, Server, Method, StatusCode};
-
-type BoxFut = Box<dyn Future<Item=Response<Body>, Error=hyper::Error> + Send>;
-
-fn router(req: Request<Body>) -> BoxFut {
-    let mut response = Response::new(Body::empty());
-
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") => {
-
-            if req.headers().contains_key("cookie") {
-                // Deserialize
-                // Send response back
-                *response.body_mut() = Body::from("Try POSTing data to /echo");
-            }else {
-                *response.body_mut() = Body::from("<b>Unauthorized</b>");
-                *response.status_mut() = StatusCode::UNAUTHORIZED;
-
-            }
-
-        
-        },
-        (&Method::POST, "/echo") => {
-            // Pass req body into res body
-            *response.body_mut() = req.into_body();
-        },
-        _ => {
-            *response.status_mut() = StatusCode::NOT_FOUND;
-        },
-    };
-
-    Box::new(future::ok(response))
+fn index(id: Identity) -> HttpResponse {
+    format!(
+        "Hello {}",
+        id.identity().unwrap_or_else(|| "Anonymous".to_owned())
+    );
+    let form = String::from("<form action=\"/login\" method=\"post\">
+    <input type=\"text\" name=\"data\" value=\"mauri\" />
+    <input type=\"submit\" />
+  </form>");
+  
+  HttpResponse::Ok().body(form)
 }
 
-fn main() {
-    // This is our socket address...
-    let addr = ([127, 0, 0, 1], 3000).into();
+fn login(id: Identity) -> HttpResponse {
+    id.remember("user1".to_owned());
+    HttpResponse::Found().header("location", "/").finish()
+}
 
-    // A `Service` is needed for every connection, so this
-    // creates one from our `hello_world` function.
-    let new_svc = || {
-        // service_fn_ok converts our function into a `Service`
-        service_fn(router)
-    };
+fn logout(id: Identity) -> HttpResponse {
+    id.forget();
+    HttpResponse::Found().header("location", "/").finish()
+}
 
-    let server = Server::bind(&addr)
-        .serve(new_svc)
-        .map_err(|e| eprintln!("server error: {}", e));
+fn main() -> std::io::Result<()> {
+    std::env::set_var("RUST_LOG", "actix_web=info");
+    env_logger::init();
 
-    // Run this server for... forever!
-    hyper::rt::run(server);
+    HttpServer::new(|| {
+        App::new()
+            .wrap(IdentityService::new(
+                CookieIdentityPolicy::new(&[0; 32])
+                    .name("auth-example")
+                    .secure(false),
+            ))
+            // enable logger - always register actix-web Logger middleware last
+            .wrap(middleware::Logger::default())
+            .service(web::resource("/login").route(web::post().to(login)))
+            .service(web::resource("/logout").to(logout))
+            .service(web::resource("/").route(web::get().to(index)))
+    })
+    .bind("127.0.0.1:3000")?
+    .run()
 }
