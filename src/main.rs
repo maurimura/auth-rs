@@ -1,17 +1,22 @@
 use actix_identity::Identity;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
-use actix_web::{middleware, web, App, HttpResponse, HttpServer};
+use actix_web::{http::StatusCode, web, App, HttpResponse, HttpServer};
 use serde::Deserialize;
 
-fn index(id: Identity) -> String {
-    format!(
-        "Hello {}",
-        id.identity().unwrap_or_else(|| "Anonymous".to_owned())
-    )
+fn index(id: Identity) -> HttpResponse {
+    // format!(
+    //     "Hello {}",
+    //     id.identity().unwrap_or_else(|| "Anonymous".to_owned())
+    // );
+    match id.identity() {
+        Some(id) => HttpResponse::Ok().body(id),
+        None => HttpResponse::new(StatusCode::UNAUTHORIZED),
+    }
 }
 
-fn login(id: Identity, data: web::Form<FormData>) -> HttpResponse {
-    id.remember(data.name.to_owned());
+fn register(id: Identity, data: web::Path<User>) -> HttpResponse {
+    println!("Llega aca");
+    id.remember(data.id.to_owned());
     HttpResponse::Found().header("location", "/").finish()
 }
 
@@ -20,21 +25,9 @@ fn logout(id: Identity) -> HttpResponse {
     HttpResponse::Found().header("location", "/").finish()
 }
 #[derive(Deserialize)]
-struct FormData {
-    name: String,
+struct User {
+    id: String,
 }
-
-fn from() -> HttpResponse {
-    let form = String::from(
-        "<form action=\"/login\" method=\"post\">
-    <input type=\"text\" name=\"name\" value=\"\" />
-    <input type=\"submit\" />
-  </form>",
-    );
-
-    HttpResponse::Ok().body(form)
-}
-
 
 fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
@@ -47,11 +40,9 @@ fn main() -> std::io::Result<()> {
                     .secure(false),
             ))
             // enable logger - always register actix-web Logger middleware last
-            .wrap(middleware::Logger::default())
-            .service(web::resource("/login").route(web::post().to(login)))
-            .service(web::resource("/logout").to(logout))
-            .service(web::resource("/signup").route(web::get().to(from)))
             .service(web::resource("/").route(web::get().to(index)))
+            .service(web::resource("/{id}").route(web::post().to(register)))
+            .service(web::resource("/logout").route(web::get().to(logout)))
     })
     .bind("127.0.0.1:3000")?
     .run()
