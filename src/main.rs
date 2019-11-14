@@ -1,14 +1,7 @@
 use actix_identity::Identity;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{middleware, web, App, HttpResponse, HttpServer};
-
 use serde::Deserialize;
-
-#[derive(Deserialize)]
-struct FormData {
-    data: String,
-}
-
 
 fn index(id: Identity) -> String {
     format!(
@@ -17,21 +10,8 @@ fn index(id: Identity) -> String {
     )
 }
 
-fn from() -> HttpResponse {
-    let form = String::from(
-        "<form action=\"/login\" method=\"post\">
-    <input type=\"text\" name=\"data\" value=\"mauri\" />
-    <input type=\"submit\" />
-  </form>",
-    );
-
-    HttpResponse::Ok().body(form)
-}
-
-fn login(id: Identity, form: web::Form<FormData>) -> HttpResponse {
-    println!("{}", form.data);
-
-    id.remember(form.data.to_owned());
+fn login(id: Identity, data: web::Form<FormData>) -> HttpResponse {
+    id.remember(data.name.to_owned());
     HttpResponse::Found().header("location", "/").finish()
 }
 
@@ -39,16 +19,31 @@ fn logout(id: Identity) -> HttpResponse {
     id.forget();
     HttpResponse::Found().header("location", "/").finish()
 }
+#[derive(Deserialize)]
+struct FormData {
+    name: String,
+}
+
+fn from() -> HttpResponse {
+    let form = String::from(
+        "<form action=\"/login\" method=\"post\">
+    <input type=\"text\" name=\"name\" value=\"\" />
+    <input type=\"submit\" />
+  </form>",
+    );
+
+    HttpResponse::Ok().body(form)
+}
+
 
 fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
-    env_logger::init();
 
     HttpServer::new(|| {
         App::new()
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&[0; 32])
-                    .name("auth-example")
+                    .name("token")
                     .secure(false),
             ))
             // enable logger - always register actix-web Logger middleware last
