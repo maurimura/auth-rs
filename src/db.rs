@@ -1,15 +1,26 @@
-extern crate r2d2;
-extern crate r2d2_mongodb;
+pub extern crate r2d2;
+pub extern crate r2d2_mongodb;
 
-
+use dotenv;
 
 use r2d2::Pool;
 use r2d2_mongodb::{ConnectionOptions, MongodbConnectionManager, VerifyPeer, mongodb::db::ThreadedDatabase};
 
 pub fn init() -> r2d2::Pool<r2d2_mongodb::MongodbConnectionManager> {
+
+    let key = "TEST_ENV";
+    let var = dotenv::var(key).unwrap();
+
+    println!("{:?}", var);
+    let db_host: &str = &dotenv::var("MONGO_HOST").expect("Env variable MONGO_HOST required");
+    let db_port = dotenv::var("MONGO_PORT").expect("Env variable MONGO_PORT required").parse::<u16>().unwrap();
+    let db_name: &str = &dotenv::var("MONGO_DB").expect("Env variable MONGO_DB required");
+
+
+
     let manager = MongodbConnectionManager::new(
         ConnectionOptions::builder()
-            .with_host("localhost", 27017)
+            .with_host(db_host, db_port)
             // .with_ssl(
             //     Some("path/to/ca.crt"),
             //     "path/to/client.crt",
@@ -20,7 +31,7 @@ pub fn init() -> r2d2::Pool<r2d2_mongodb::MongodbConnectionManager> {
             //     Some("path/to/ca.crt"),
             //     VerifyPeer::No
             // )
-            .with_db("FUNDAR")
+            .with_db(db_name)
             .build(),
     );
 
