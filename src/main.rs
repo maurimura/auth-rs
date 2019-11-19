@@ -3,48 +3,55 @@ use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{http::StatusCode, web, App, HttpResponse, HttpServer};
 use serde::Deserialize;
 mod db;
-use db::r2d2_mongodb::mongodb::{db::ThreadedDatabase, doc, bson, Bson};
-use serde_json::json;
+use db::r2d2_mongodb::mongodb::{
+    bson, coll::options::FindOptions, db::ThreadedDatabase, doc, oid, Bson };
 
 type Pool = db::r2d2::Pool<db::r2d2_mongodb::MongodbConnectionManager>;
 
-fn index(
-    id: Identity,
-    db: web::Data<Pool>,
-) -> HttpResponse {
-    // format!(
-    //     "Hello {}",
-    //     id.identity().unwrap_or_else(|| "Anonymous".to_owned())
-    // );
+fn index(id: Identity, db: web::Data<Pool>) -> HttpResponse {
     match id.identity() {
         Some(id) => {
             let conn = db.get().unwrap();
-            let user_data = conn.collection("Users").find_one(None, None).unwrap();
+            let filter =
+                Some(doc! { "_id" => Bson::ObjectId(oid::ObjectId::with_string(&id).unwrap()) });
+            let mut projection = FindOptions::new();
+            projection.projection = Some(doc! {
+                "pass" => false,
+            });
+
+            let user_data = conn
+                .collection("Users")
+                .find_one(filter, Some(projection))
+                .unwrap();
+
             HttpResponse::Ok().json(user_data)
         }
-        None => HttpResponse::new(StatusCode::UNAUTHORIZED),
+        None => {
+            println!("No ID matched");
+            HttpResponse::new(StatusCode::UNAUTHORIZED)
+        }
     }
 }
 
 fn register(id: Identity, data: web::Json<User>, db: web::Data<Pool>) -> HttpResponse {
-    println!("Llega aca");
-    println!("{} {}", data.username, data.password);
     let conn = db.get().unwrap();
-    
-    let user_data = conn.collection("Users").find_one(Some(doc!{ "username" => data.username.clone() }), None).unwrap();
-    println!("{:?}", user_data);
+
+    let user_data = conn
+        .collection("Users")
+        .find_one(Some(doc! { "username" => data.username.clone() }), None)
+        .unwrap();
 
     match user_data {
-        Some(doc) => match doc.get("_id") {
-            Some(mongo_id) => println!("{}", mongo_id),
-            _ => println!("_id not found") 
+        Some(doc) => match doc.get_object_id("_id").unwrap() {
+            oid => {
+                id.remember(oid.to_hex());
+                HttpResponse::Ok().body("Welcome")
+            }
         },
-        None => println!("User not match")
+        None => HttpResponse::new(StatusCode::UNAUTHORIZED),
     }
 
-
     // id.remember(data.id.to_owned());
-    HttpResponse::Found().header("location", "/").finish()
 }
 
 fn logout(id: Identity) -> HttpResponse {
