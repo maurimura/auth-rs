@@ -4,7 +4,7 @@ pub extern crate r2d2_mongodb;
 use dotenv;
 
 use r2d2::Pool;
-use r2d2_mongodb::{ConnectionOptions, MongodbConnectionManager, VerifyPeer, mongodb::db::ThreadedDatabase};
+use r2d2_mongodb::{ConnectionOptions, MongodbConnectionManager };
 
 pub fn init() -> r2d2::Pool<r2d2_mongodb::MongodbConnectionManager> {
 
