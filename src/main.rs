@@ -24,6 +24,7 @@ fn main() -> std::io::Result<()> {
                     .domain(domain.clone())
                     .path("/")
                     .name("token")
+                    .max_age(3600*9)
                     .secure(false),
             ))
             .wrap(
