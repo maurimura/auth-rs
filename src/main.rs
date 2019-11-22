@@ -22,6 +22,7 @@ fn main() -> std::io::Result<()> {
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&[0; 32])
                     .domain(domain.clone())
+                    .path("/")
                     .name("token")
                     .secure(false),
             ))
