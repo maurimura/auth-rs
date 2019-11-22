@@ -9,7 +9,6 @@ use super::db::r2d2_mongodb::mongodb::{
 type Pool = super::db::r2d2::Pool<super::db::r2d2_mongodb::MongodbConnectionManager>;
 
 pub fn index(id: Identity, db: web::Data<Pool>) -> HttpResponse {
-    println!("ENTRA ACA!");
     match id.identity() {
         Some(id) => {
             let conn = db.get().unwrap();
@@ -25,12 +24,9 @@ pub fn index(id: Identity, db: web::Data<Pool>) -> HttpResponse {
                 .find_one(filter, Some(projection))
                 .unwrap();
 
-            println!("MATCHEA!!");
-            println!("{:?}", user_data);
             HttpResponse::Ok().json(user_data)
         }
         None => {
-            println!("No ID matched");
             HttpResponse::new(StatusCode::UNAUTHORIZED)
         }
     }

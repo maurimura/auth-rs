@@ -5,11 +5,13 @@ mod auth;
 mod db;
 
 use auth::{index, logout, register};
+use dotenv;
 
 extern crate argon2;
 
 fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
+    let port: &str = &dotenv::var("PORT").expect("Env variable PORT required");
 
     let pool = db::init();
 
@@ -34,6 +36,6 @@ fn main() -> std::io::Result<()> {
             .service(web::resource("/login").route(web::post().to(register)))
             .service(web::resource("/logout").route(web::get().to(logout)))
     })
-    .bind("127.0.0.1:7070")?
+    .bind(format!("127.0.0.1:{}", port))?
     .run()
 }
