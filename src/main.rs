@@ -34,6 +34,6 @@ fn main() -> std::io::Result<()> {
             .service(web::resource("/login").route(web::post().to(register)))
             .service(web::resource("/logout").route(web::get().to(logout)))
     })
-    .bind("127.0.0.1:3000")?
+    .bind("127.0.0.1:7070")?
     .run()
 }
