@@ -12,6 +12,7 @@ extern crate argon2;
 fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     let port: &str = &dotenv::var("PORT").expect("Env variable PORT required");
+    let domain = dotenv::var("DOMAIN").expect("Env variable DOMAIN required");
 
     let pool = db::init();
 
@@ -20,6 +21,7 @@ fn main() -> std::io::Result<()> {
             .data(pool.clone())
             .wrap(IdentityService::new(
                 CookieIdentityPolicy::new(&[0; 32])
+                    .domain(domain.clone())
                     .name("token")
                     .secure(false),
             ))
