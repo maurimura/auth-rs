@@ -1,5 +1,5 @@
 use actix_identity::Identity;
-use actix_web::{http::StatusCode, web, HttpResponse};
+use actix_web::{http::StatusCode, web, HttpResponse, HttpRequest};
 use serde::Deserialize;
 
 use super::db::r2d2_mongodb::mongodb::{
@@ -8,9 +8,14 @@ use super::db::r2d2_mongodb::mongodb::{
 
 type Pool = super::db::r2d2::Pool<super::db::r2d2_mongodb::MongodbConnectionManager>;
 
-pub fn index(id: Identity, db: web::Data<Pool>) -> HttpResponse {
+pub fn index(req: HttpRequest, id: Identity, db: web::Data<Pool>) -> HttpResponse {
+    println!("{:?}", req);
     match id.identity() {
         Some(id) => {
+            if cfg!(debug_assertions) {
+                println!("ID Matched: {}", id);
+            }
+
             let conn = db.get().unwrap();
             let filter =
                 Some(doc! { "_id" => Bson::ObjectId(oid::ObjectId::with_string(&id).unwrap()) });
@@ -27,6 +32,10 @@ pub fn index(id: Identity, db: web::Data<Pool>) -> HttpResponse {
             HttpResponse::Ok().json(user_data)
         }
         None => {
+            if cfg!(debug_assertions) {
+                println!("ID not matched");
+            }
+
             HttpResponse::new(StatusCode::UNAUTHORIZED)
         }
     }

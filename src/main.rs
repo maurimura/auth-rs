@@ -1,11 +1,12 @@
 use actix_cors::Cors;
+use actix_http::cookie::SameSite;
 use actix_identity::{CookieIdentityPolicy, IdentityService};
 use actix_web::{http::header, web, App, HttpServer};
-mod auth;
-mod db;
-
 use auth::{index, logout, register};
 use dotenv;
+
+mod auth;
+mod db;
 
 extern crate argon2;
 
@@ -23,7 +24,8 @@ fn main() -> std::io::Result<()> {
                 CookieIdentityPolicy::new(&[0; 32])
                     .path("/")
                     .name("token")
-                    .max_age(3600*9)
+                    .max_age(3600 * 9)
+                    .same_site(SameSite::Lax)
                     .secure(cfg!(not(debug_assertions))),
             ))
             .wrap(
