@@ -1,5 +1,5 @@
 use actix_identity::Identity;
-use actix_web::{http::StatusCode, web, HttpResponse, HttpRequest};
+use actix_web::{http::StatusCode, web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 
 use super::db::r2d2_mongodb::mongodb::{
@@ -41,8 +41,18 @@ pub fn index(req: HttpRequest, id: Identity, db: web::Data<Pool>) -> HttpRespons
     }
 }
 
-pub fn register(id: Identity, data: web::Json<User>, db: web::Data<Pool>) -> HttpResponse {
+pub fn register(
+    req: HttpRequest,
+    id: Identity,
+    data: web::Json<User>,
+    db: web::Data<Pool>,
+) -> HttpResponse {
     let conn = db.get().unwrap();
+    println!("[REGISTER] {:?}", req);
+
+    if cfg!(debug_assertions) {
+        println!("{}", data.username);
+    }
 
     let user_data = conn
         .collection("Users")
@@ -52,6 +62,10 @@ pub fn register(id: Identity, data: web::Json<User>, db: web::Data<Pool>) -> Htt
     match user_data {
         Some(doc) => match doc.get("pass") {
             Some(pass) => {
+                if cfg!(debug_assertions) {
+                    println!("USER MATCHED");
+                }
+
                 // Chcek password
                 let matches = argon2::verify_encoded(
                     pass.as_str().unwrap(),
@@ -59,6 +73,10 @@ pub fn register(id: Identity, data: web::Json<User>, db: web::Data<Pool>) -> Htt
                 )
                 .unwrap();
                 if matches {
+                    if cfg!(debug_assertions) {
+                        println!("Password matched");
+                    }
+
                     match doc.get_object_id("_id").unwrap() {
                         oid => {
                             id.remember(oid.to_hex());
