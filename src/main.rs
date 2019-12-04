@@ -1,6 +1,6 @@
 use actix_cors::Cors;
 use actix_http::cookie::SameSite;
-use actix_identity::{CookieIdentityPolicy, IdentityService};
+use actix_session::{CookieSession, Session};
 use actix_web::{http::header, web, App, HttpServer};
 use auth::{index, logout, register};
 use dotenv;
@@ -20,17 +20,16 @@ fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .data(pool.clone())
-            .wrap(IdentityService::new(
-                CookieIdentityPolicy::new(&[0; 32])
+            .wrap(CookieSession::signed(&[0; 32])
                     .path("/")
                     .name("token")
                     .max_age(3600 * 9)
                     .same_site(SameSite::Lax)
                     .secure(cfg!(not(debug_assertions))),
-            ))
+            )
             .wrap(
                 Cors::new()
-                    .allowed_origin("http://localhost:4200")
+                    .allowed_origin("http://v2.fundar.com.ar")
                     .supports_credentials()
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])

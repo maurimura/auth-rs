@@ -1,4 +1,5 @@
-use actix_identity::Identity;
+use actix_session::Session;
+
 use actix_web::{http::StatusCode, web, HttpRequest, HttpResponse};
 use serde::Deserialize;
 
@@ -8,10 +9,11 @@ use super::db::r2d2_mongodb::mongodb::{
 
 type Pool = super::db::r2d2::Pool<super::db::r2d2_mongodb::MongodbConnectionManager>;
 
-pub fn index(req: HttpRequest, id: Identity, db: web::Data<Pool>) -> HttpResponse {
+pub fn index(req: HttpRequest, session: Session, db: web::Data<Pool>) -> HttpResponse {
     println!("{:?}", req);
-    match id.identity() {
-        Some(id) => {
+
+    match session.get::<String>("token") {
+        Ok(Some(id)) => {
             if cfg!(debug_assertions) {
                 println!("ID Matched: {}", id);
             }
@@ -31,7 +33,7 @@ pub fn index(req: HttpRequest, id: Identity, db: web::Data<Pool>) -> HttpRespons
 
             HttpResponse::Ok().json(user_data)
         }
-        None => {
+        _ => {
             if cfg!(debug_assertions) {
                 println!("ID not matched");
             }
@@ -43,7 +45,7 @@ pub fn index(req: HttpRequest, id: Identity, db: web::Data<Pool>) -> HttpRespons
 
 pub fn register(
     req: HttpRequest,
-    id: Identity,
+    session: Session,
     data: web::Json<User>,
     db: web::Data<Pool>,
 ) -> HttpResponse {
@@ -78,10 +80,10 @@ pub fn register(
                     }
 
                     match doc.get_object_id("_id").unwrap() {
-                        oid => {
-                            id.remember(oid.to_hex());
-                            HttpResponse::Ok().body("Welcome")
-                        }
+                        oid => match session.set("token", oid.to_hex()) {
+                            Ok(()) => HttpResponse::Ok().body("Welcome"),
+                            _ => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+                        },
                     }
                 } else {
                     HttpResponse::new(StatusCode::UNAUTHORIZED)
@@ -93,9 +95,11 @@ pub fn register(
     }
 }
 
-pub fn logout(id: Identity) -> HttpResponse {
-    id.forget();
-    HttpResponse::Found().header("location", "/").finish()
+pub fn logout(session: Session) -> HttpResponse {
+    match session.set("token", "") {
+        Ok(()) => HttpResponse::Found().header("location", "/").finish(),
+        _ => HttpResponse::new(StatusCode::INTERNAL_SERVER_ERROR),
+    }
 }
 #[derive(Deserialize)]
 pub struct User {
