@@ -1,6 +1,6 @@
 use actix_cors::Cors;
 use actix_http::cookie::SameSite;
-use actix_session::{CookieSession, Session};
+use actix_session::{CookieSession};
 use actix_web::{http::header, web, App, HttpServer};
 use auth::{index, logout, register};
 use dotenv;
@@ -13,7 +13,7 @@ extern crate argon2;
 fn main() -> std::io::Result<()> {
     std::env::set_var("RUST_LOG", "actix_web=info");
     let port: &str = &dotenv::var("PORT").expect("Env variable PORT required");
-    // let domain = dotenv::var("DOMAIN").expect("Env variable DOMAIN required");
+    let domain = dotenv::var("DOMAIN").expect("Env variable DOMAIN required");
 
     let pool = db::init();
 
@@ -23,13 +23,14 @@ fn main() -> std::io::Result<()> {
             .wrap(CookieSession::signed(&[0; 32])
                     .path("/")
                     .name("token")
+                    .domain(domain.clone())
                     .max_age(3600 * 9)
                     .same_site(SameSite::Lax)
                     .secure(cfg!(not(debug_assertions))),
             )
             .wrap(
                 Cors::new()
-                    .allowed_origin("http://v2.fundar.com.ar")
+                    .allowed_origin("http://dev.fundar.com.ar")
                     .supports_credentials()
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
