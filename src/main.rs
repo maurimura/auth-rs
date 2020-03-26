@@ -1,46 +1,48 @@
-use actix_cors::Cors;
-use actix_http::cookie::SameSite;
-use actix_session::{CookieSession};
-use actix_web::{http::header, web, App, HttpServer};
-use auth::{index, logout, register};
-use dotenv;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server, Method, StatusCode};
+use authenticator;
 
-mod auth;
-mod db;
+async fn routes(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
+    
+    match (req.method(), req.uri().path()){
+         // Serve some instructions at /
+         (&Method::GET, "/") => Ok(Response::new(Body::from(
+            "Try POSTing data to /echo such as: `curl localhost:3000/echo -XPOST -d 'hello world'`",
+        ))),
 
-extern crate argon2;
+        // Simply echo the body back to the client.
+        (&Method::POST, "/") => Ok(Response::new(req.into_body())),
 
-fn main() -> std::io::Result<()> {
-    std::env::set_var("RUST_LOG", "actix_web=info");
-    let port: &str = &dotenv::var("PORT").expect("Env variable PORT required");
-    let domain = dotenv::var("DOMAIN").expect("Env variable DOMAIN required");
+        // Return the 404 Not Found for other routes.
+        _ => {
+            let mut not_found = Response::default();
+            *not_found.status_mut() = StatusCode::NOT_FOUND;
+            Ok(not_found)
+        }
+    }
 
-    let pool = db::init();
+}
 
-    HttpServer::new(move || {
-        App::new()
-            .data(pool.clone())
-            .wrap(CookieSession::signed(&[0; 32])
-                    .path("/")
-                    .name("token")
-                    .domain(domain.clone())
-                    .max_age(3600 * 9)
-                    .same_site(SameSite::Lax)
-                    .secure(cfg!(not(debug_assertions))),
-            )
-            .wrap(
-                Cors::new()
-                    .allowed_origin("http://dev.fundar.com.ar")
-                    .supports_credentials()
-                    .allowed_methods(vec!["GET", "POST"])
-                    .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
-                    .allowed_header(header::CONTENT_TYPE)
-                    .max_age(3600),
-            )
-            .service(web::resource("/").route(web::get().to(index)))
-            .service(web::resource("/login").route(web::post().to(register)))
-            .service(web::resource("/logout").route(web::get().to(logout)))
-    })
-    .bind(format!("127.0.0.1:{}", port))?
-    .run()
+#[tokio::main]
+pub async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    authenticator::hello_world();
+    authenticator::Authenticator::serialize("This should be the user");
+    // For every connection, we must make a `Service` to handle all
+    // incoming HTTP requests on said connection.
+    let make_svc = make_service_fn(|_conn| {
+        // This is the `Service` that will handle the connection.
+        // `service_fn` is a helper to convert a function that
+        // returns a Response into a `Service`.
+        async { Ok::<_,  hyper::Error>(service_fn(routes)) }
+    });
+
+    let addr = ([127, 0, 0, 1], 3000).into();
+
+    let server = Server::bind(&addr).serve(make_svc);
+
+    println!("Listening on http://{}", addr);
+
+    server.await?;
+
+    Ok(())
 }
